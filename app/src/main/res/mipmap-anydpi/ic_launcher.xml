@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ceno_icon_background" />
+    <item android:drawable="@drawable/ceno_kitsune_inset" />
+</layer-list>

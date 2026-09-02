@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Ceno</string>
+    <string name="widget_art_description">Ceno widget görseli</string>
+    <string name="widget_drawing_name">Ceno · Çizim İlhamı</string>
+    <string name="widget_diary_name">Ceno · Günlük</string>
+    <string name="widget_photo_name">Ceno · Günün Fotoğrafı</string>
+    <string name="widget_pet_name">Ceno · Minik Dostum</string>
+    <string name="widget_letters_name">Ceno · Mektuplar</string>
+    <string name="widget_moa_name">Ceno · MOA Köşem</string>
+</resources>

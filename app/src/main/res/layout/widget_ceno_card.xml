@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_ceno_background">
+
+    <ImageView
+        android:id="@+id/widget_art"
+        android:layout_width="104dp"
+        android:layout_height="match_parent"
+        android:layout_gravity="end|center_vertical"
+        android:background="@drawable/widget_ceno_art_background"
+        android:clipToOutline="true"
+        android:contentDescription="@string/widget_art_description"
+        android:padding="4dp"
+        android:scaleType="centerCrop"
+        android:src="@drawable/ceno_kitsune_foreground" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingEnd="116dp">
+
+        <TextView
+            android:id="@+id/widget_eyebrow"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="Ceno ♡"
+            android:textColor="#355E3B"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/widget_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="1"
+            android:text="minik bir köşe"
+            android:textColor="#263328"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/widget_body"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="5dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="3"
+            android:text="tatlı anıların burada seni bekliyor ♡"
+            android:textColor="#65715F"
+            android:textSize="11sp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/widget_footer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="dokun ve aç"
+                android:textColor="#8FAD79"
+                android:textSize="9sp" />
+
+            <TextView
+                android:id="@+id/widget_refresh"
+                android:layout_width="32dp"
+                android:layout_height="26dp"
+                android:background="@drawable/widget_ceno_button"
+                android:gravity="center"
+                android:text="↻"
+                android:textColor="#355E3B"
+                android:textSize="16sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

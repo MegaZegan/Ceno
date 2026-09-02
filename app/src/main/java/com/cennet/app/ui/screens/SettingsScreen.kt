@@ -27,13 +27,12 @@ import org.json.JSONObject
 
 @Composable
 fun SettingsScreen(
-    repository:CennetRepository,displayName:String,birthday:String,themeIndex:Int,
-    onDisplayName:(String)->Unit,onBirthday:(String)->Unit,onTheme:(Int)->Unit,onReset:suspend ()->Unit
+    repository:CennetRepository,displayName:String,birthday:String,themeIndex:Int,fontIndex:Int,
+    onDisplayName:(String)->Unit,onBirthday:(String)->Unit,onTheme:(Int)->Unit,onFont:(Int)->Unit,onReset:suspend ()->Unit
 ) {
     val context=LocalContext.current
     var name by remember(displayName){mutableStateOf(displayName)}
     var date by remember(birthday){mutableStateOf(birthday)}
-    var fontIndex by remember{mutableIntStateOf(0)}
     var status by remember{mutableStateOf("")}
     var confirmReset by remember{mutableStateOf(false)}
     val scope=rememberCoroutineScope()
@@ -49,8 +48,8 @@ fun SettingsScreen(
             status="$label widget'ı için ana ekran onayı açıldı ♡"
         } else status="ana ekrana uzun basıp Ceno widget'ını seçebilirsin ♡"
     }
-    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{val diary=JSONArray();repository.allDiaryEntries().forEach{entry->diary.put(JSONObject().put("date",entry.date).put("text",entry.text).put("photoUri",entry.photoUri).put("updatedAt",entry.updatedAt))};val root=JSONObject().put("displayName",name).put("birthday",date).put("theme",themeIndex).put("diary",diary);context.contentResolver.openOutputStream(it)?.bufferedWriter()?.use{writer->writer.write(root.toString(2))}}.onSuccess{status="yedek kaydedildi ♡"}.onFailure{status="yedek kaydedilemedi"}}}}
-    val restore=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{context.contentResolver.openInputStream(it)?.bufferedReader()?.use{reader->JSONObject(reader.readText())}}.onSuccess{json->json?.let{name=it.optString("displayName",name);date=it.optString("birthday",date);onDisplayName(name);onBirthday(date);onTheme(it.optInt("theme",themeIndex));val diary=it.optJSONArray("diary");if(diary!=null)for(i in 0 until diary.length()){val entry=diary.getJSONObject(i);repository.saveDiary(DiaryEntry(date=entry.getString("date"),text=entry.getString("text"),photoUri=entry.optString("photoUri").takeUnless{value->value=="null"||value.isBlank()},updatedAt=entry.optLong("updatedAt",System.currentTimeMillis())))};status="yedek geri yüklendi ♡"}}.onFailure{status="bu yedek okunamadı"}}}}
+    val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")){uri->uri?.let{scope.launch{runCatching{val diary=JSONArray();repository.allDiaryEntries().forEach{entry->diary.put(JSONObject().put("date",entry.date).put("text",entry.text).put("photoUri",entry.photoUri).put("updatedAt",entry.updatedAt))};val root=JSONObject().put("displayName",name).put("birthday",date).put("theme",themeIndex).put("font",fontIndex).put("diary",diary);context.contentResolver.openOutputStream(it)?.bufferedWriter()?.use{writer->writer.write(root.toString(2))}}.onSuccess{status="günlük ve ayarlar yedeği kaydedildi ♡"}.onFailure{status="yedek kaydedilemedi"}}}}
+    val restore=rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()){uri->uri?.let{scope.launch{runCatching{context.contentResolver.openInputStream(it)?.bufferedReader()?.use{reader->JSONObject(reader.readText())}}.onSuccess{json->json?.let{name=it.optString("displayName",name);date=it.optString("birthday",date);onDisplayName(name);onBirthday(date);onTheme(it.optInt("theme",themeIndex));onFont(it.optInt("font",fontIndex));val diary=it.optJSONArray("diary");if(diary!=null)for(i in 0 until diary.length()){val entry=diary.getJSONObject(i);repository.saveDiary(DiaryEntry(date=entry.getString("date"),text=entry.getString("text"),photoUri=entry.optString("photoUri").takeUnless{value->value=="null"||value.isBlank()},updatedAt=entry.optLong("updatedAt",System.currentTimeMillis())))};status="günlük ve ayarlar geri yüklendi ♡"}}.onFailure{status="bu yedek okunamadı"}}}}
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         DarkSectionHeader("AYARLAR",Modifier.fillMaxWidth())
         CuteCard(Modifier.fillMaxWidth().weight(1f),corner=18.dp,padding=24.dp) {
@@ -63,9 +62,9 @@ fun SettingsScreen(
                     SettingRow("görünen ad") { SoftInput(name,"Ceno"){name=it;onDisplayName(it)} }
                     SettingRow("doğum günü") { SoftInput(date,"AA-GG"){value->date=value.filter{it.isDigit()||it=='-'}.take(5);onBirthday(date)} }
                     SettingRow("tema") { Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){CennetColorPalettes.forEachIndexed{i,palette->Box(Modifier.size(if(i==themeIndex)34.dp else 29.dp).background(palette.lightGreen,androidx.compose.foundation.shape.CircleShape).border(if(i==themeIndex)2.dp else .7.dp,palette.forest,androidx.compose.foundation.shape.CircleShape).clickable{onTheme(i)})} } }
-                    SettingRow("yazı tipi") { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){listOf(FontFamily.Cursive,FontFamily.SansSerif,FontFamily.Serif).forEachIndexed{i,font->Box(Modifier.background(if(fontIndex==i)cennetColors.lightGreen else cennetColors.background,RoundedCornerShape(10.dp)).clickable{fontIndex=i}.padding(horizontal=18.dp,vertical=8.dp)){Text("Aa",fontFamily=font,fontSize=17.sp)}}} }
+                    SettingRow("yazı tipi") { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){listOf(FontFamily.Cursive,FontFamily.SansSerif,FontFamily.Serif).forEachIndexed{i,font->Box(Modifier.background(if(fontIndex==i)cennetColors.lightGreen else cennetColors.background,RoundedCornerShape(10.dp)).clickable{onFont(i);status="yazı tipi kaydedildi ♡"}.padding(horizontal=18.dp,vertical=8.dp)){Text("Aa",fontFamily=font,fontSize=17.sp)}}} }
                     SettingRow("ana ekran widget'ları") { Column(verticalArrangement=Arrangement.spacedBy(7.dp)) { widgets.chunked(3).forEach { row -> Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) { row.forEach { (label, provider) -> SoftButton(label) { pinWidget(provider,label) } } } } } }
-                    SettingRow("yedekle ve geri yükle") { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){SoftButton("yedekle"){export.launch("cennet-yedek.json")};SoftButton("geri yükle"){restore.launch(arrayOf("application/json"))}} }
+                    SettingRow("günlük ve ayarlar yedeği") { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){SoftButton("yedekle"){export.launch("ceno-yedek.json")};SoftButton("geri yükle"){restore.launch(arrayOf("application/json"))}} }
                     SettingRow("yerel veriler") { SoftButton("tüm verileri sıfırla"){confirmReset=true} }
                     if(status.isNotBlank())Text(status,fontSize=10.sp,color=cennetColors.midGreen,modifier=Modifier.padding(top=10.dp))
                 }

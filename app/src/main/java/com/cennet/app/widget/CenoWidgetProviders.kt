@@ -15,6 +15,7 @@ import android.widget.RemoteViews
 import com.cennet.app.MainActivity
 import com.cennet.app.R
 import com.cennet.app.data.repository.CennetRepository
+import com.cennet.app.data.repository.PetStateStore
 import com.cennet.app.model.CennetScreen
 import com.cennet.app.model.drawingPrompts
 import kotlinx.coroutines.CoroutineScope
@@ -83,9 +84,9 @@ private suspend fun updateWidget(context: Context, manager: AppWidgetManager, wi
             val latest = CennetRepository(context).allDiaryEntries().firstOrNull()
             views.setTextViewText(R.id.widget_eyebrow, "günlük ♡")
             views.setTextViewText(R.id.widget_title, latest?.date?.let(::friendlyDate) ?: "bugünün sayfası")
-            views.setTextViewText(R.id.widget_body, latest?.text?.replace('\n', ' ') ?: "bugün güzel bir gündü ♡")
+            views.setTextViewText(R.id.widget_body, latest?.text?.replace('\n', ' ') ?: "henüz yazılmış bir sayfa yok ♡")
             views.setTextViewText(R.id.widget_footer, if (latest == null) "ilk anını yaz" else "anını aç")
-            setWidgetBitmap(context, views, latest?.photoUri, R.drawable.diary_default_memory)
+            setWidgetBitmap(context, views, latest?.photoUri, if (latest == null) R.drawable.ceno_kitsune_foreground else R.drawable.diary_default_memory)
         }
         WidgetKind.PHOTO -> {
             val repository = CennetRepository(context)
@@ -93,15 +94,15 @@ private suspend fun updateWidget(context: Context, manager: AppWidgetManager, wi
             val selected = pool.randomOrNull() ?: repository.photoOfDay
             views.setTextViewText(R.id.widget_eyebrow, "günün fotoğrafı ❀")
             views.setTextViewText(R.id.widget_title, "minik bir hatıra")
-            views.setTextViewText(R.id.widget_body, if (pool.isEmpty()) "Ceno'daki sevdiğin anı ♡" else "galerinden seçilen ${pool.size} anıdan biri")
+            views.setTextViewText(R.id.widget_body, if (selected == null) "galeri izni verince anını kendisi seçer ♡" else "galerinden rastgele seçilen bugünün anısı")
             views.setTextViewText(R.id.widget_footer, "fotoğraf köşesini aç")
-            setWidgetBitmap(context, views, selected, R.drawable.diary_default_memory)
+            setWidgetBitmap(context, views, selected, R.drawable.ceno_kitsune_foreground)
         }
         WidgetKind.PET -> {
-            val prefs = context.getSharedPreferences("minik_dostum", Context.MODE_PRIVATE)
-            val hunger = prefs.getInt("tokluk", 72)
-            val happiness = prefs.getInt("mutluluk", 84)
-            val energy = prefs.getInt("enerji", 66)
+            val stats = PetStateStore.loadAndDecay(context)
+            val hunger = stats.hunger
+            val happiness = stats.happiness
+            val energy = stats.energy
             views.setTextViewText(R.id.widget_eyebrow, "minik dostum ♧")
             views.setTextViewText(R.id.widget_title, "Doggy seni bekliyor")
             views.setTextViewText(R.id.widget_body, "tokluk %$hunger  ·  mutluluk %$happiness  ·  enerji %$energy")
@@ -121,13 +122,13 @@ private suspend fun updateWidget(context: Context, manager: AppWidgetManager, wi
         }
         WidgetKind.MOA -> {
             val prefs = context.getSharedPreferences("moa", Context.MODE_PRIVATE)
-            val song = prefs.getString("song", "Deja Vu") ?: "Deja Vu"
-            val rating = prefs.getInt("rating", 5).coerceIn(1, 5)
+            val song = prefs.getString("song", "").orEmpty()
+            val rating = prefs.getInt("rating", 0).coerceIn(0, 5)
             views.setTextViewText(R.id.widget_eyebrow, "moa köşem ♡")
-            views.setTextViewText(R.id.widget_title, song)
-            views.setTextViewText(R.id.widget_body, "${"★".repeat(rating)}${"☆".repeat(5 - rating)}  ·  $rating / 5")
-            views.setTextViewText(R.id.widget_footer, "favorilerini aç")
-            views.setImageViewResource(R.id.widget_art, songArtwork(song))
+            views.setTextViewText(R.id.widget_title, song.ifBlank { "favorilerini seç" })
+            views.setTextViewText(R.id.widget_body, if (rating == 0) "puan ve favori şarkı henüz seçilmedi" else "${"★".repeat(rating)}${"☆".repeat(5 - rating)}  ·  $rating / 5")
+            views.setTextViewText(R.id.widget_footer, "MOA köşeni doldur ♡")
+            views.setImageViewResource(R.id.widget_art, if (song.isBlank()) R.drawable.ceno_kitsune_foreground else songArtwork(song))
         }
     }
 

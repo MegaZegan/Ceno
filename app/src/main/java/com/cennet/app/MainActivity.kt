@@ -25,6 +25,7 @@ import com.cennet.app.ui.theme.CennetTheme
 import com.cennet.app.ui.theme.cennetColors
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
     private val requestedScreen = mutableStateOf(CennetScreen.HOME)
@@ -35,11 +36,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val repository = remember { CennetRepository(applicationContext) }
             var themeIndex by remember { mutableIntStateOf(repository.themeIndex) }
-            CennetTheme(themeIndex) {
-                CennetApp(repository, themeIndex, requestedScreen.value) {
-                    themeIndex = it
-                    repository.themeIndex = it
-                }
+            var fontIndex by remember { mutableIntStateOf(repository.fontIndex) }
+            CennetTheme(themeIndex, fontIndex) {
+                CennetApp(
+                    repository, themeIndex, fontIndex, requestedScreen.value,
+                    onThemeChange = { themeIndex = it; repository.themeIndex = it },
+                    onFontChange = { fontIndex = it; repository.fontIndex = it }
+                )
             }
         }
     }
@@ -62,14 +65,13 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun CennetApp(repository: CennetRepository, themeIndex: Int, requestedScreen: CennetScreen, onThemeChange: (Int) -> Unit) {
+private fun CennetApp(repository: CennetRepository, themeIndex: Int, fontIndex: Int, requestedScreen: CennetScreen, onThemeChange: (Int) -> Unit, onFontChange: (Int) -> Unit) {
     var screen by remember { mutableStateOf(requestedScreen) }
     LaunchedEffect(requestedScreen) { screen = requestedScreen }
-    var displayName by remember { mutableStateOf("Ceno") }
-    val initialBirthday = remember { repository.birthday.takeUnless { it.isBlank() || it == "09-18" } ?: "03-09" }
-    var birthday by remember { mutableStateOf(initialBirthday) }
-    LaunchedEffect(initialBirthday) { repository.birthday = initialBirthday; repository.displayName = "Ceno" }
-    val today = remember { LocalDate.now() }
+    var displayName by remember { mutableStateOf(repository.displayName) }
+    var birthday by remember { mutableStateOf(repository.birthday.ifBlank { "03-09" }) }
+    var today by remember { mutableStateOf(LocalDate.now()) }
+    LaunchedEffect(Unit) { while (true) { delay(30_000); today = LocalDate.now() } }
     val birthdayMode = birthday == today.format(DateTimeFormatter.ofPattern("MM-dd"))
 
     BoxWithConstraints(Modifier.fillMaxSize().background(cennetColors.background)) {
@@ -84,7 +86,7 @@ private fun CennetApp(repository: CennetRepository, themeIndex: Int, requestedSc
             )
             Box(Modifier.weight(1f).fillMaxHeight().background(cennetColors.sage.copy(.48f))) {
                 when (screen) {
-                    CennetScreen.HOME -> HomeScreen(repository, birthdayMode) { screen = it }
+                    CennetScreen.HOME -> HomeScreen(repository, birthdayMode, displayName) { screen = it }
                     CennetScreen.DIARY -> DiaryScreen(repository)
                     CennetScreen.GARDEN -> MoodGardenScreen()
                     CennetScreen.REFERENCES -> ReferenceShelfScreen()
@@ -92,11 +94,12 @@ private fun CennetApp(repository: CennetRepository, themeIndex: Int, requestedSc
                     CennetScreen.LETTERS -> LettersScreen(birthdayMode)
                     CennetScreen.MERCH -> MerchBagScreen(repository)
                     CennetScreen.SETTINGS -> SettingsScreen(
-                        repository, displayName, birthday, themeIndex,
+                        repository, displayName, birthday, themeIndex, fontIndex,
                         onDisplayName = { displayName = it; repository.displayName = it },
                         onBirthday = { birthday = it; repository.birthday = it },
                         onTheme = onThemeChange,
-                        onReset = { repository.resetAll(); displayName = "Ceno"; birthday = "03-09"; onThemeChange(0) }
+                        onFont = onFontChange,
+                        onReset = { repository.resetAll(); displayName = "Ceno"; birthday = "03-09"; onThemeChange(0); onFontChange(1) }
                     )
                 }
             }
@@ -113,7 +116,7 @@ private fun Sidebar(
     modifier: Modifier = Modifier
 ) {
     Column(modifier.background(cennetColors.background).padding(horizontal = if (compact) 10.dp else 18.dp, vertical = 18.dp)) {
-        Text("Ceno ♡", color = cennetColors.forest, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontSize = if (compact) 25.sp else 32.sp)
+        Text("${name.ifBlank { "Ceno" }} ♡", color = cennetColors.forest, fontFamily = androidx.compose.ui.text.font.FontFamily.Cursive, fontSize = if (compact) 25.sp else 32.sp, maxLines = 1)
         if (!compact) Text("yalnızca sana ait minik bir dünya ♡", color = cennetColors.mutedText, fontSize = 10.sp)
         Spacer(Modifier.height(20.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(7.dp)) {

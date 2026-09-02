@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -18,25 +19,39 @@ import com.cennet.app.ui.components.*
 import com.cennet.app.ui.theme.cennetColors
 import com.cennet.app.R
 import com.cennet.app.widget.CenoWidgets
+import com.cennet.app.data.repository.PetStateStore
+import com.cennet.app.data.repository.PetStats
 import kotlinx.coroutines.delay
 import kotlin.math.min
 
 @Composable
 fun MoodGardenScreen() {
     val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("minik_dostum", Context.MODE_PRIVATE) }
-    var tokluk by remember { mutableIntStateOf(prefs.getInt("tokluk", 72)) }
-    var mutluluk by remember { mutableIntStateOf(prefs.getInt("mutluluk", 84)) }
-    var enerji by remember { mutableIntStateOf(prefs.getInt("enerji", 66)) }
+    val initial = remember { PetStateStore.loadAndDecay(context) }
+    var tokluk by remember { mutableIntStateOf(initial.hunger) }
+    var mutluluk by remember { mutableIntStateOf(initial.happiness) }
+    var enerji by remember { mutableIntStateOf(initial.energy) }
     var mesaj by remember { mutableStateOf("Seni gördüğüme çok sevindim! ♡") }
     var tepki by remember { mutableStateOf(DoggyMood.IDLE) }
     var tepkiSayaci by remember { mutableIntStateOf(0) }
+    var etkileşimKilidi by remember { mutableStateOf(false) }
 
     LaunchedEffect(tokluk, mutluluk, enerji) {
-        prefs.edit().putInt("tokluk", tokluk).putInt("mutluluk", mutluluk).putInt("enerji", enerji).apply()
+        PetStateStore.save(context, PetStats(tokluk, mutluluk, enerji))
         CenoWidgets.refreshAll(context)
     }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            val current = PetStateStore.loadAndDecay(context)
+            tokluk = current.hunger
+            mutluluk = current.happiness
+            enerji = current.energy
+        }
+    }
     fun etkileşim(yeniMesaj: String, yeniTepki: DoggyMood, değiştir: () -> Unit) {
+        if (etkileşimKilidi) return
+        etkileşimKilidi = true
         değiştir(); mesaj = yeniMesaj; tepki = yeniTepki; tepkiSayaci++
     }
 
@@ -45,6 +60,7 @@ fun MoodGardenScreen() {
             delay(2_600)
             tepki = DoggyMood.IDLE
             mesaj = "Yanında olmak çok güzel ♡"
+            etkileşimKilidi = false
         }
     }
 
@@ -86,27 +102,27 @@ fun MoodGardenScreen() {
                     Text("birlikte ne yapalım?", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = cennetColors.darkForest)
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PetEylem("besle", "🍓", Modifier.weight(1f)) {
+                        PetEylem("besle", "🍓", Modifier.weight(1f), !etkileşimKilidi) {
                             if (tokluk >= 95) etkileşim("Karnım çok tok, şimdi istemiyorum!", DoggyMood.ANGRY) {}
                             else etkileşim("Mmm, çok lezzetliydi!", DoggyMood.HAPPY) { tokluk = min(100, tokluk + 16); enerji = min(100, enerji + 3) }
                         }
-                        PetEylem("oyna", "✦", Modifier.weight(1f)) {
+                        PetEylem("oyna", "✦", Modifier.weight(1f), !etkileşimKilidi) {
                             if (enerji < 15) etkileşim("Çok yorgunum, biraz dinlenelim!", DoggyMood.ANGRY) {}
                             else etkileşim("Bir daha oynayalım! ♡", DoggyMood.HAPPY) { mutluluk = min(100, mutluluk + 17); enerji = (enerji - 7).coerceAtLeast(0) }
                         }
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        PetEylem("sev", "♡", Modifier.weight(1f)) { etkileşim("Aaa! Bu sevgi beni şaşırttı ♡", DoggyMood.SURPRISED) { mutluluk = min(100, mutluluk + 11) } }
-                        PetEylem("uyut", "☾", Modifier.weight(1f)) {
-                            if (enerji > 90) etkileşim("Ama benim hiç uykum yok ki!", DoggyMood.ANGRY) {}
-                            else etkileşim("Biraz kestireceğim... zzz", DoggyMood.IDLE) { enerji = min(100, enerji + 22); tokluk = (tokluk - 3).coerceAtLeast(0) }
+                        PetEylem("sev", "♡", Modifier.weight(1f), !etkileşimKilidi) { etkileşim("Aaa! Bu sevgi beni şaşırttı ♡", DoggyMood.SURPRISED) { mutluluk = min(100, mutluluk + 11) } }
+                        PetEylem("ödül ver", "♧", Modifier.weight(1f), !etkileşimKilidi) {
+                            if (tokluk >= 97 && mutluluk >= 97) etkileşim("Şimdilik yeter, biraz sonra yine verirsin!", DoggyMood.ANGRY) {}
+                            else etkileşim("Bu ödüle bayıldım! ♡", DoggyMood.HAPPY) { mutluluk = min(100, mutluluk + 9); tokluk = min(100, tokluk + 5) }
                         }
                     }
                     Spacer(Modifier.weight(1f))
                     CuteCard(Modifier.fillMaxWidth().height(82.dp), background = cennetColors.peach.copy(.42f), corner = 15.dp, padding = 13.dp) {
                         Text("minik not", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = cennetColors.darkForest)
-                        Text("Doggy seni beklerken üzülmez. Ne zaman istersen kaldığınız yerden devam edebilirsiniz ♡", Modifier.align(Alignment.BottomStart), fontSize = 9.sp, lineHeight = 14.sp, color = cennetColors.mutedText)
+                        Text("Değerleri uygulama kapalıyken de yavaşça azalır. Her tepki bitince yeniden oynayabilirsin ♡", Modifier.align(Alignment.BottomStart), fontSize = 9.sp, lineHeight = 14.sp, color = cennetColors.mutedText)
                     }
                 }
             }
@@ -128,8 +144,8 @@ private fun PetDurum(ad: String, simge: String, değer: Int) {
 }
 
 @Composable
-private fun PetEylem(ad: String, simge: String, modifier: Modifier, onClick: () -> Unit) {
-    CuteCard(modifier.height(86.dp), background = cennetColors.cream, corner = 16.dp, padding = 9.dp, onClick = onClick) {
+private fun PetEylem(ad: String, simge: String, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
+    CuteCard(modifier.height(86.dp).alpha(if (enabled) 1f else .55f), background = cennetColors.cream, corner = 16.dp, padding = 9.dp, onClick = { if (enabled) onClick() }) {
         Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) { Text(simge, fontSize = 23.sp); Text(ad, fontSize = 10.sp, color = cennetColors.darkForest) }
     }
 }

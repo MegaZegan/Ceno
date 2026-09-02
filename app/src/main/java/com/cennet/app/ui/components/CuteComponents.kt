@@ -96,7 +96,11 @@ fun DoodleSparkles(modifier: Modifier = Modifier, tint: Color = cennetColors.mid
 fun UriImage(uri: String?, modifier: Modifier, placeholder: @Composable BoxScope.() -> Unit) {
     val context = LocalContext.current
     val bitmap = remember(uri) {
-        uri?.let { value -> runCatching { context.contentResolver.openInputStream(android.net.Uri.parse(value))?.use { android.graphics.BitmapFactory.decodeStream(it) } }.getOrNull() }
+        uri?.let { value -> runCatching {
+            if (value.startsWith("content://") || value.startsWith("file://")) {
+                context.contentResolver.openInputStream(android.net.Uri.parse(value))?.use { android.graphics.BitmapFactory.decodeStream(it) }
+            } else android.graphics.BitmapFactory.decodeFile(value)
+        }.getOrNull() }
     }
     Box(modifier.clip(RoundedCornerShape(10.dp)).background(cennetColors.sage), contentAlignment = Alignment.Center) {
         if (bitmap != null) Image(bitmap.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else placeholder()

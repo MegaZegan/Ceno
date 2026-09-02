@@ -29,12 +29,18 @@ class CennetRepository(context: Context) {
     var photoOfDay: String?
         get() = prefs.getString("photo_of_day", null)
         set(value) { prefs.edit { putString("photo_of_day", value) }; CenoWidgets.refreshAll(appContext) }
+    var photoOfDayDate: String?
+        get() = prefs.getString("photo_of_day_date", null)
+        set(value) { prefs.edit { putString("photo_of_day_date", value) } }
     var photoPool: List<String>
         get() = prefs.getString("photo_pool", "").orEmpty().lines().filter { it.isNotBlank() }
         set(value) { prefs.edit { putString("photo_pool", value.distinct().joinToString("\n")) }; CenoWidgets.refreshAll(appContext) }
     var themeIndex: Int
         get() = prefs.getInt("theme", 0)
         set(value) = prefs.edit { putInt("theme", value) }
+    var fontIndex: Int
+        get() = prefs.getInt("font", 1).coerceIn(0, 2)
+        set(value) = prefs.edit { putInt("font", value.coerceIn(0, 2)) }
     fun loadMerchSlots(): List<MerchSlot> = runCatching {
         val savedLayout = prefs.getString("merch_layout", null)
         if (savedLayout != null) {
@@ -66,7 +72,8 @@ class CennetRepository(context: Context) {
     suspend fun resetAll() {
         diary.clearAll()
         appContext.filesDir.resolve("merch_slots").deleteRecursively()
-        listOf("cennet_preferences", "garden", "minik_dostum", "moa", "references").forEach {
+        appContext.filesDir.resolve("reference_images").deleteRecursively()
+        listOf("cennet_preferences", "garden", "minik_dostum", "moa", "references", "home_moods", "home_reminders").forEach {
             appContext.getSharedPreferences(it, Context.MODE_PRIVATE).edit().clear().apply()
         }
         CenoWidgets.refreshAll(appContext)

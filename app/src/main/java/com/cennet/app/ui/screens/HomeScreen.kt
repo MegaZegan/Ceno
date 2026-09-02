@@ -1,6 +1,12 @@
 package com.cennet.app.ui.screens
 
 import android.app.DatePickerDialog
+import android.Manifest
+import android.content.ContentUris
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -20,28 +26,49 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
+import androidx.core.content.ContextCompat
 import com.cennet.app.data.repository.CennetRepository
 import com.cennet.app.model.*
 import com.cennet.app.ui.components.*
 import com.cennet.app.ui.theme.cennetColors
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.random.Random
+import org.json.JSONArray
+import org.json.JSONObject
 
 @Composable
 fun HomeScreen(
     repository: CennetRepository,
     birthdayMode: Boolean,
+    displayName: String,
     navigate: (CennetScreen) -> Unit
 ) {
     var now by remember { mutableStateOf(LocalDateTime.now()) }
     LaunchedEffect(Unit) { while (true) { now = LocalDateTime.now(); delay(30_000) } }
     var showBirthday by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val moodPrefs = remember { context.getSharedPreferences("home_moods", Context.MODE_PRIVATE) }
+    val todayKey = now.toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+    var moodIndex by remember(todayKey) { mutableIntStateOf(moodPrefs.getInt(todayKey, 1).coerceIn(Mood.entries.indices)) }
+    var moodRevision by remember { mutableIntStateOf(0) }
+    val weekMoods = remember(todayKey, moodRevision) {
+        (6 downTo 0).map { daysAgo ->
+            val date = now.toLocalDate().minusDays(daysAgo.toLong())
+            val saved = moodPrefs.getInt(date.format(DateTimeFormatter.ISO_LOCAL_DATE), -1)
+            date to Mood.entries.getOrNull(saved)
+        }
+    }
+    val changeMood: (Int) -> Unit = { selected ->
+        moodIndex = selected
+        moodPrefs.edit().putInt(todayKey, selected).apply()
+        moodRevision++
+    }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp)) {
-        HomeHeader(now)
+        HomeHeader(now, displayName)
         if (birthdayMode) {
             Spacer(Modifier.height(10.dp))
             BirthdayBanner { showBirthday = true }
@@ -49,7 +76,7 @@ fun HomeScreen(
         Spacer(Modifier.height(12.dp))
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val roomy = maxWidth >= 740.dp
-            if (roomy) LandscapeHomeGrid(repository) else CompactHomeGrid(repository)
+            if (roomy) LandscapeHomeGrid(repository, moodIndex, changeMood, weekMoods) else CompactHomeGrid(repository, moodIndex, changeMood, weekMoods)
         }
         Spacer(Modifier.height(14.dp))
         Text("✦   en sevdiğim insansın ♡   ·   hayatımda olduğun için teşekkür ederim   ✦", Modifier.fillMaxWidth(), color = cennetColors.mutedText, fontSize = 11.sp, textAlign = TextAlign.Center)
@@ -60,7 +87,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(now: LocalDateTime) {
+private fun HomeHeader(now: LocalDateTime, displayName: String) {
     val greeting = when (now.hour) {
         in 5..11 -> "Günaydın! ♡"
         in 12..17 -> "Güzel bir gün! ♡"
@@ -69,7 +96,7 @@ private fun HomeHeader(now: LocalDateTime) {
     }
     Row(Modifier.fillMaxWidth().height(78.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("Ceno ♡", color = cennetColors.forest, style = androidx.compose.material3.MaterialTheme.typography.displayLarge)
+            Text("${displayName.ifBlank { "Ceno" }} ♡", color = cennetColors.forest, style = androidx.compose.material3.MaterialTheme.typography.displayLarge, maxLines = 1)
             Text("yalnızca sana ait minik bir dünya ♡", color = cennetColors.mutedText, fontSize = 11.sp)
         }
         Box(Modifier.width(250.dp).fillMaxHeight()) {
@@ -87,10 +114,10 @@ private fun HomeHeader(now: LocalDateTime) {
 }
 
 @Composable
-private fun LandscapeHomeGrid(repository: CennetRepository) {
+private fun LandscapeHomeGrid(repository: CennetRepository, moodIndex: Int, onMoodChange: (Int) -> Unit, weekMoods: List<Pair<LocalDate, Mood?>>) {
     Column(verticalArrangement = Arrangement.spacedBy(13.dp)) {
         Row(Modifier.fillMaxWidth().height(194.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
-            MoodCard(Modifier.weight(.8f).fillMaxHeight())
+            MoodCard(moodIndex, onMoodChange, Modifier.weight(.8f).fillMaxHeight())
             ReminderCard(Modifier.weight(1.25f).fillMaxHeight())
         }
         Row(Modifier.fillMaxWidth().height(174.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
@@ -101,60 +128,93 @@ private fun LandscapeHomeGrid(repository: CennetRepository) {
         Row(Modifier.fillMaxWidth().height(158.dp), horizontalArrangement = Arrangement.spacedBy(13.dp)) {
             PhotoCard(repository, Modifier.weight(1.16f).fillMaxHeight())
             InstalledDaysCard(Modifier.weight(1f).fillMaxHeight())
-            WeekCard(Modifier.weight(1.1f).fillMaxHeight())
+            WeekCard(weekMoods, Modifier.weight(1.1f).fillMaxHeight())
         }
     }
 }
 
 @Composable
-private fun CompactHomeGrid(repository: CennetRepository) {
+private fun CompactHomeGrid(repository: CennetRepository, moodIndex: Int, onMoodChange: (Int) -> Unit, weekMoods: List<Pair<LocalDate, Mood?>>) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(Modifier.fillMaxWidth().height(190.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { MoodCard(Modifier.weight(1f)); ReminderCard(Modifier.weight(1.2f)) }
+        Row(Modifier.fillMaxWidth().height(190.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { MoodCard(moodIndex, onMoodChange, Modifier.weight(1f)); ReminderCard(Modifier.weight(1.2f)) }
         Row(Modifier.fillMaxWidth().height(170.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { PaletteCard(Modifier.weight(1f)); LittleNoteCard(Modifier.weight(1f)) }
         InspirationCard(Modifier.fillMaxWidth().height(170.dp))
         PhotoCard(repository, Modifier.fillMaxWidth().height(170.dp))
-        Row(Modifier.fillMaxWidth().height(155.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { InstalledDaysCard(Modifier.weight(1f)); WeekCard(Modifier.weight(1.1f)) }
+        Row(Modifier.fillMaxWidth().height(155.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) { InstalledDaysCard(Modifier.weight(1f)); WeekCard(weekMoods, Modifier.weight(1.1f)) }
     }
 }
 
 @Composable
-private fun MoodCard(modifier: Modifier) {
-    var moodIndex by remember { mutableIntStateOf(1) }
+private fun MoodCard(moodIndex: Int, onMoodChange: (Int) -> Unit, modifier: Modifier) {
     val mood = Mood.entries[moodIndex]
-    val colors = cennetColors
-    CuteCard(modifier, padding = 15.dp, onClick = { moodIndex = (moodIndex + 1) % Mood.entries.size }) {
-        Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-            SectionTitle("bugünkü ruh halim", Modifier.align(Alignment.Start))
-            Box(Modifier.size(78.dp), contentAlignment = Alignment.Center) {
-                Canvas(Modifier.fillMaxSize()) {
-                    val cloud = Path().apply {
-                        moveTo(size.width*.18f,size.height*.68f); cubicTo(size.width*.03f,size.height*.58f,size.width*.12f,size.height*.38f,size.width*.31f,size.height*.40f)
-                        cubicTo(size.width*.36f,size.height*.15f,size.width*.69f,size.height*.15f,size.width*.72f,size.height*.42f)
-                        cubicTo(size.width*.96f,size.height*.40f,size.width*.98f,size.height*.72f,size.width*.77f,size.height*.75f)
-                        lineTo(size.width*.25f,size.height*.75f); close()
-                    }
-                    drawPath(cloud, Color.White); drawPath(cloud, colors.lightGreen, style=androidx.compose.ui.graphics.drawscope.Stroke(2f))
-                    drawCircle(colors.text, 2.2f, Offset(size.width*.43f,size.height*.57f)); drawCircle(colors.text,2.2f,Offset(size.width*.59f,size.height*.57f))
-                    drawCircle(colors.pink,4f,Offset(size.width*.35f,size.height*.63f)); drawCircle(colors.pink,4f,Offset(size.width*.67f,size.height*.63f))
+    CuteCard(modifier, padding = 15.dp) {
+        Column(Modifier.fillMaxSize()) {
+            SectionTitle("bugünkü ruh halim")
+            Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                MoodFace(mood, Modifier.size(82.dp))
+                Spacer(Modifier.width(15.dp))
+                Column {
+                    Text(mood.label, color = cennetColors.darkForest, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("bugün böyle hissediyorum ♡", color = cennetColors.mutedText, fontSize = 9.sp)
                 }
-                Text(mood.face, fontSize = 7.sp, modifier = Modifier.offset(y = 10.dp), color = cennetColors.text)
             }
-            Text(mood.label + "   ⌄", color = cennetColors.darkForest, fontSize = 13.sp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Mood.entries.forEachIndexed { index, option ->
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape)
+                            .background(if (index == moodIndex) cennetColors.lightGreen else cennetColors.background)
+                            .border(if (index == moodIndex) 1.dp else .5.dp, if (index == moodIndex) cennetColors.forest else cennetColors.sage, CircleShape)
+                            .clickable { onMoodChange(index) },
+                        contentAlignment = Alignment.Center
+                    ) { Text(option.face, fontSize = 6.sp, color = cennetColors.text, maxLines = 1) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoodFace(mood: Mood, modifier: Modifier = Modifier) {
+    val colors = cennetColors
+    val fill = when (mood) {
+        Mood.HAPPY -> colors.lightGreen
+        Mood.COZY -> colors.sage
+        Mood.TIRED -> Color(0xFFD8DDD0)
+        Mood.SAD -> Color(0xFFD7E2E5)
+        Mood.EXCITED -> colors.peach
+        Mood.MEH -> Color(0xFFE5E0D3)
+    }
+    Canvas(modifier) {
+        drawCircle(fill)
+        drawCircle(colors.forest.copy(.6f), style = androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
+        drawCircle(colors.text, 3.2f, Offset(size.width * .38f, size.height * .43f))
+        drawCircle(colors.text, 3.2f, Offset(size.width * .62f, size.height * .43f))
+        drawCircle(colors.pink.copy(.8f), 6f, Offset(size.width * .27f, size.height * .58f))
+        drawCircle(colors.pink.copy(.8f), 6f, Offset(size.width * .73f, size.height * .58f))
+        when (mood) {
+            Mood.SAD -> drawArc(colors.text, 205f, 130f, false, Offset(size.width*.40f,size.height*.58f), Size(size.width*.20f,size.height*.14f), style=androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
+            Mood.MEH, Mood.TIRED -> drawLine(colors.text, Offset(size.width*.43f,size.height*.64f), Offset(size.width*.57f,size.height*.64f), 2.5f)
+            else -> drawArc(colors.text, 15f, 150f, false, Offset(size.width*.40f,size.height*.53f), Size(size.width*.20f,size.height*.18f), style=androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
         }
     }
 }
 
 @Composable
 private fun ReminderCard(modifier: Modifier) {
-    var items by remember { mutableStateOf(listOf(
-        ReminderItem(1,"su iç",true), ReminderItem(2,"çizimini bitir"), ReminderItem(3,"TXT dinle"), ReminderItem(4,"kendine nazik davran")
-    )) }
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("home_reminders", Context.MODE_PRIVATE) }
+    var items by remember { mutableStateOf(readReminders(prefs.getString("items", null))) }
     var editing by remember { mutableStateOf(false) }
+    fun save(updated: List<ReminderItem>) {
+        items = updated
+        prefs.edit().putString("items", writeReminders(updated)).apply()
+    }
     PaperNote(modifier) {
         SectionTitle("hatırlatıcı")
         Spacer(Modifier.height(8.dp))
+        if (items.isEmpty()) Text("bugün için henüz bir not yok ♡", fontSize = 10.sp, color = cennetColors.mutedText)
         items.forEachIndexed { index, item ->
-            Row(Modifier.fillMaxWidth().clickable { items = items.toMutableList().also { it[index] = item.copy(done = !item.done) } }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clickable { save(items.toMutableList().also { it[index] = item.copy(done = !item.done) }) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(15.dp).border(1.dp, cennetColors.midGreen, RoundedCornerShape(3.dp)).background(if (item.done) cennetColors.lightGreen else Color.Transparent, RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) { if(item.done) Text("✓", fontSize = 10.sp, color = cennetColors.forest) }
                 Spacer(Modifier.width(9.dp)); Text(item.text, fontSize = 10.sp, color = cennetColors.text, maxLines = 1)
             }
@@ -162,9 +222,26 @@ private fun ReminderCard(modifier: Modifier) {
         Text("＋ listeyi düzenle", Modifier.clickable { editing = true }.padding(top = 4.dp), fontSize = 9.sp, color = cennetColors.midGreen)
     }
     if (editing) TextEditor("hatırlatıcılar (her satıra bir tane)", items.joinToString("\n") { it.text }, { editing = false }, multiline = true) { value ->
-        items = value.lines().filter { it.isNotBlank() }.take(6).mapIndexed { i, s -> ReminderItem(i, s.trim()) }; editing = false
+        val previousByText = items.associateBy { it.text }
+        save(value.lines().filter { it.isNotBlank() }.take(6).mapIndexed { i, s ->
+            val text = s.trim()
+            ReminderItem(i, text, previousByText[text]?.done == true)
+        })
+        editing = false
     }
 }
+
+private fun readReminders(raw: String?): List<ReminderItem> = runCatching {
+    val array = JSONArray(raw ?: "[]")
+    List(array.length()) { index ->
+        val item = array.getJSONObject(index)
+        ReminderItem(index, item.getString("text"), item.optBoolean("done", false))
+    }.filter { it.text.isNotBlank() }
+}.getOrDefault(emptyList())
+
+private fun writeReminders(items: List<ReminderItem>): String = JSONArray().apply {
+    items.forEach { put(JSONObject().put("text", it.text).put("done", it.done)) }
+}.toString()
 
 @Composable
 private fun PaletteCard(modifier: Modifier) {
@@ -246,28 +323,91 @@ private fun LittleNoteCard(modifier: Modifier) {
 
 @Composable
 private fun PhotoCard(repository: CennetRepository, modifier: Modifier) {
-    var pool by remember { mutableStateOf(repository.photoPool) }
-    var uri by remember { mutableStateOf(pool.randomOrNull() ?: repository.photoOfDay) }
     val context = LocalContext.current
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { picked ->
-        if (picked.isNotEmpty()) {
-            picked.forEach { runCatching { context.contentResolver.takePersistableUriPermission(it, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION) } }
-            pool = (pool + picked.map { it.toString() }).distinct()
-            repository.photoPool = pool
-            uri = pool.randomOrNull()
-            repository.photoOfDay = uri
+    val scope = rememberCoroutineScope()
+    var today by remember { mutableStateOf(LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)) }
+    var uri by remember(today) { mutableStateOf(repository.photoOfDay.takeIf { repository.photoOfDayDate == today }) }
+    var loading by remember { mutableStateOf(false) }
+    var permissionRequested by remember { mutableStateOf(false) }
+
+    fun hasGalleryAccess(): Boolean = when {
+        Build.VERSION.SDK_INT >= 34 -> ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) == PackageManager.PERMISSION_GRANTED
+        Build.VERSION.SDK_INT >= 33 -> ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+        else -> ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+    }
+
+    fun chooseRandomPhoto() {
+        scope.launch {
+            loading = true
+            val selected = randomGalleryImage(context, uri)
+            if (selected != null) {
+                uri = selected
+                repository.photoOfDay = selected
+                repository.photoOfDayDate = today
+            }
+            loading = false
         }
     }
-    CuteCard(modifier, padding = 0.dp, onClick = { if(pool.isEmpty()) launcher.launch(arrayOf("image/*")) else uri = pool.randomOrNull() }) {
+
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if (result.values.any { it } || hasGalleryAccess()) chooseRandomPhoto()
+    }
+    val permissions = remember {
+        when {
+            Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+            Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+            else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        }
+    }
+
+    LaunchedEffect(today) {
+        if (hasGalleryAccess()) {
+            if (uri == null) chooseRandomPhoto()
+        } else if (!permissionRequested) {
+            permissionRequested = true
+            permissionLauncher.launch(permissions)
+        }
+    }
+
+    CuteCard(modifier, padding = 0.dp, onClick = {
+        if (hasGalleryAccess()) chooseRandomPhoto() else permissionLauncher.launch(permissions)
+    }) {
         Text("günün fotoğrafı", Modifier.padding(15.dp).align(Alignment.TopStart).zIndex(2f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = cennetColors.darkForest)
         UriImage(uri, Modifier.fillMaxSize().padding(top = 39.dp, start = 8.dp, end = 8.dp, bottom = 8.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("❀", fontSize = 34.sp, color = cennetColors.midGreen); Text("galeriden birkaç anı seç", fontSize = 9.sp, color = cennetColors.mutedText) }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(if (loading) "✦" else "❀", fontSize = 34.sp, color = cennetColors.midGreen)
+                Text(if (loading) "bugünün anısı seçiliyor..." else if (hasGalleryAccess()) "galeride henüz fotoğraf yok" else "galeri izni için dokun ♡", fontSize = 9.sp, color = cennetColors.mutedText)
+            }
         }
-        Row(Modifier.align(Alignment.TopEnd).padding(9.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if(pool.isNotEmpty()) Text("↻", Modifier.clickable { uri = pool.randomOrNull() }, color = cennetColors.midGreen)
-            Text("＋", Modifier.clickable { launcher.launch(arrayOf("image/*")) }, color = cennetColors.midGreen)
-        }
+        Text("başka bir anı  ↻", Modifier.align(Alignment.TopEnd).clickable(enabled = !loading) { if (hasGalleryAccess()) chooseRandomPhoto() else permissionLauncher.launch(permissions) }.padding(13.dp), fontSize = 9.sp, color = cennetColors.midGreen)
     }
+}
+
+private suspend fun randomGalleryImage(context: Context, current: String?): String? = withContext(Dispatchers.IO) {
+    runCatching {
+        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val ids = mutableListOf<Long>()
+        context.contentResolver.query(
+            collection,
+            arrayOf(MediaStore.Images.Media._ID),
+            null,
+            null,
+            "${MediaStore.Images.Media.DATE_ADDED} DESC"
+        )?.use { cursor ->
+            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+            while (cursor.moveToNext()) ids += cursor.getLong(idColumn)
+        }
+        val candidates = ids.map { ContentUris.withAppendedId(collection, it).toString() }
+        candidates.filterNot { it == current }.randomOrNull() ?: candidates.firstOrNull()
+    }.getOrNull()
 }
 
 @Composable
@@ -292,15 +432,24 @@ private fun InstalledDaysCard(modifier: Modifier) {
 }
 
 @Composable
-private fun WeekCard(modifier: Modifier) {
-    val values = listOf(.35f,.22f,.27f,.55f,.31f,.75f,.42f)
+private fun WeekCard(weekMoods: List<Pair<LocalDate, Mood?>>, modifier: Modifier) {
+    val savedCount = weekMoods.count { it.second != null }
     CuteCard(modifier, padding = 15.dp) {
-        SectionTitle("bu hafta")
-        Text("çizim süresi", Modifier.padding(top = 31.dp), fontSize = 9.sp)
-        Text("12sa 45dk", Modifier.padding(top = 46.dp), fontSize = 17.sp, color = cennetColors.darkForest)
-        Row(Modifier.fillMaxWidth().height(60.dp).align(Alignment.BottomCenter), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.Bottom) {
-            val gunler = listOf("P","S","Ç","P","C","C","P")
-            values.forEachIndexed { i, v -> Column(horizontalAlignment = Alignment.CenterHorizontally) { Box(Modifier.width(10.dp).height((45*v).dp).background(if(i%3==0)cennetColors.midGreen else cennetColors.lightGreen,RoundedCornerShape(5.dp))); Text(gunler[i],fontSize=7.sp) } }
+        SectionTitle("bu haftanın ruh halleri")
+        Text(if (savedCount == 0) "ilk ruh halini seç, burası seninle dolsun ♡" else "$savedCount gün kaydedildi ♡", Modifier.padding(top = 31.dp), fontSize = 9.sp, color = cennetColors.mutedText)
+        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            weekMoods.forEach { (date, mood) ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(31.dp).clip(CircleShape)
+                            .background(if (mood == null) Color.Transparent else cennetColors.sage)
+                            .border(.8.dp, if (mood == null) cennetColors.lightGreen else cennetColors.midGreen, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) { Text(mood?.face ?: "·", fontSize = if (mood == null) 13.sp else 5.sp, color = cennetColors.text, maxLines = 1) }
+                    Spacer(Modifier.height(4.dp))
+                    Text(date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, Locale.forLanguageTag("tr-TR")), fontSize = 7.sp, color = cennetColors.mutedText)
+                }
+            }
         }
     }
 }

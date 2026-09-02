@@ -36,7 +36,6 @@ fun DiaryScreen(repository: CennetRepository) {
     val entries by repository.entries.collectAsState(initial = emptyList())
     var selected by remember(entries) { mutableStateOf(entries.firstOrNull()) }
     var editing by remember { mutableStateOf(false) }
-    val sample = DiaryEntry(date = LocalDate.now().toString(), text = "bugün güzel bir gündü ♡\nbol bol çizim yaptım ve\ntüm gün TXT dinledim hehe\nçok mutluyum :)")
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         DarkSectionHeader("GÜNLÜK", Modifier.fillMaxWidth())
         CuteCard(Modifier.fillMaxWidth().weight(1f), corner = 18.dp, padding = 0.dp) {
@@ -46,15 +45,36 @@ fun DiaryScreen(repository: CennetRepository) {
                 if (wide) {
                     Row(Modifier.fillMaxSize()) {
                         DiaryTimeline(entries, selected, { selected = it }, { editing = true }, Modifier.width(165.dp).fillMaxHeight())
-                        Spacer(Modifier.width(18.dp)); DiaryPage(repository, selected ?: sample, Modifier.weight(1f), onEdit = { editing = true }, onDelete = { entry -> selected = null })
+                        Spacer(Modifier.width(18.dp))
+                        if (selected == null) DiaryEmptyPage(Modifier.weight(1f)) { editing = true }
+                        else DiaryPage(repository, selected!!, Modifier.weight(1f), onEdit = { editing = true }, onDelete = { selected = null })
                     }
                 } else {
-                    Column { DiaryTimeline(entries, selected, { selected = it }, { editing = true }, Modifier.fillMaxWidth().height(100.dp)); Spacer(Modifier.height(12.dp)); DiaryPage(repository, selected ?: sample, Modifier.fillMaxWidth().weight(1f), onEdit={editing=true}, onDelete={selected=null}) }
+                    Column {
+                        DiaryTimeline(entries, selected, { selected = it }, { editing = true }, Modifier.fillMaxWidth().height(100.dp))
+                        Spacer(Modifier.height(12.dp))
+                        if (selected == null) DiaryEmptyPage(Modifier.fillMaxWidth().weight(1f)) { editing = true }
+                        else DiaryPage(repository, selected!!, Modifier.fillMaxWidth().weight(1f), onEdit={editing=true}, onDelete={selected=null})
+                    }
                 }
             }
         }
     }
     if (editing) DiaryEditor(selected, onDismiss = { editing = false }) { editing = false; selected = it }
+}
+
+@Composable
+private fun DiaryEmptyPage(modifier: Modifier, onAdd: () -> Unit) {
+    Box(modifier.background(Color(0xFFFEFAED), RoundedCornerShape(8.dp)).border(.7.dp, cennetColors.border, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+        Tape(Modifier.width(54.dp).height(16.dp).align(Alignment.TopCenter).offset(y=(-8).dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("henüz yazılmış bir sayfa yok ♡", fontFamily = FontFamily.Cursive, fontSize = 26.sp, color = cennetColors.forest)
+            Spacer(Modifier.height(8.dp))
+            Text("ilk anını kendi fotoğrafın ve sözlerinle sakla", fontSize = 10.sp, color = cennetColors.mutedText)
+            Spacer(Modifier.height(18.dp))
+            SoftButton("＋ ilk sayfamı yaz", onClick = onAdd)
+        }
+    }
 }
 
 @Composable

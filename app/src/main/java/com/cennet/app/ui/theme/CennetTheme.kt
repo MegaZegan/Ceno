@@ -40,22 +40,25 @@ val CennetColorPalettes = listOf(
 
 val LocalCennetColors = staticCompositionLocalOf { GreenCennetColors }
 
-private val CennetTypography = Typography(
-    displayLarge = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 43.sp, lineHeight = 46.sp, fontWeight = FontWeight.Normal),
-    headlineLarge = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 30.sp, lineHeight = 34.sp),
-    headlineMedium = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 23.sp, lineHeight = 27.sp),
-    titleLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
-    titleMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-    bodyLarge = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 14.sp, lineHeight = 21.sp),
-    bodyMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 12.sp, lineHeight = 18.sp),
-    labelMedium = TextStyle(fontFamily = FontFamily.SansSerif, fontSize = 11.sp)
-)
+private fun cennetTypography(fontIndex: Int): Typography {
+    val bodyFont = listOf(FontFamily.Cursive, FontFamily.SansSerif, FontFamily.Serif)[fontIndex.coerceIn(0, 2)]
+    return Typography(
+        displayLarge = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 43.sp, lineHeight = 46.sp, fontWeight = FontWeight.Normal),
+        headlineLarge = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 30.sp, lineHeight = 34.sp),
+        headlineMedium = TextStyle(fontFamily = FontFamily.Cursive, fontSize = 23.sp, lineHeight = 27.sp),
+        titleLarge = TextStyle(fontFamily = bodyFont, fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+        titleMedium = TextStyle(fontFamily = bodyFont, fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
+        bodyLarge = TextStyle(fontFamily = bodyFont, fontSize = 14.sp, lineHeight = 21.sp),
+        bodyMedium = TextStyle(fontFamily = bodyFont, fontSize = 12.sp, lineHeight = 18.sp),
+        labelMedium = TextStyle(fontFamily = bodyFont, fontSize = 11.sp)
+    )
+}
 
 @Composable
-fun CennetTheme(themeIndex: Int = 0, content: @Composable () -> Unit) {
+fun CennetTheme(themeIndex: Int = 0, fontIndex: Int = 1, content: @Composable () -> Unit) {
     val colors = CennetColorPalettes[themeIndex.coerceIn(CennetColorPalettes.indices)]
     CompositionLocalProvider(LocalCennetColors provides colors) {
-        MaterialTheme(typography = CennetTypography, content = content)
+        MaterialTheme(typography = cennetTypography(fontIndex), content = content)
     }
 }
 

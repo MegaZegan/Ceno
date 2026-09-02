@@ -60,7 +60,7 @@ fun SettingsScreen(
                     Text("her şey usulca bu cihazda kalır ♡",fontSize=10.sp,color=cennetColors.mutedText)
                     Spacer(Modifier.height(24.dp))
                     SettingRow("görünen ad") { SoftInput(name,"Ceno"){name=it;onDisplayName(it)} }
-                    SettingRow("doğum günü") { SoftInput(date,"AA-GG"){value->date=value.filter{it.isDigit()||it=='-'}.take(5);onBirthday(date)} }
+                    SettingRow("doğum günü") { SoftInput(date,"GG-AA"){value->date=value.filter{it.isDigit()||it=='-'}.take(5);onBirthday(date)} }
                     SettingRow("tema") { Row(horizontalArrangement=Arrangement.spacedBy(12.dp)){CennetColorPalettes.forEachIndexed{i,palette->Box(Modifier.size(if(i==themeIndex)34.dp else 29.dp).background(palette.lightGreen,androidx.compose.foundation.shape.CircleShape).border(if(i==themeIndex)2.dp else .7.dp,palette.forest,androidx.compose.foundation.shape.CircleShape).clickable{onTheme(i)})} } }
                     SettingRow("yazı tipi") { Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){listOf(FontFamily.Cursive,FontFamily.SansSerif,FontFamily.Serif).forEachIndexed{i,font->Box(Modifier.background(if(fontIndex==i)cennetColors.lightGreen else cennetColors.background,RoundedCornerShape(10.dp)).clickable{onFont(i);status="yazı tipi kaydedildi ♡"}.padding(horizontal=18.dp,vertical=8.dp)){Text("Aa",fontFamily=font,fontSize=17.sp)}}} }
                     SettingRow("ana ekran widget'ları") { Column(verticalArrangement=Arrangement.spacedBy(7.dp)) { widgets.chunked(3).forEach { row -> Row(horizontalArrangement=Arrangement.spacedBy(7.dp)) { row.forEach { (label, provider) -> SoftButton(label) { pinWidget(provider,label) } } } } } }

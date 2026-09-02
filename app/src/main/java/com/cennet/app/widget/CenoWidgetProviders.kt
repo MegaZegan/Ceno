@@ -113,7 +113,7 @@ private suspend fun updateWidget(context: Context, manager: AppWidgetManager, wi
         }
         WidgetKind.LETTERS -> {
             val birthday = CennetRepository(context).birthday
-            val unlocked = LocalDate.now().format(DateTimeFormatter.ofPattern("MM-dd")) == birthday
+            val unlocked = LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MM")) == birthday
             views.setTextViewText(R.id.widget_eyebrow, "mektuplar ✉")
             views.setTextViewText(R.id.widget_title, if (unlocked) "bir mektup seni bekliyor ♡" else "doğum gününde aç")
             views.setTextViewText(R.id.widget_body, if (unlocked) "iyi ki doğdun! özel mektubun artık açık." else "bu mektup henüz hazır değil ♡")

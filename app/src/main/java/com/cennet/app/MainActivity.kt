@@ -72,7 +72,7 @@ private fun CennetApp(repository: CennetRepository, themeIndex: Int, fontIndex: 
     var birthday by remember { mutableStateOf(repository.birthday.ifBlank { "03-09" }) }
     var today by remember { mutableStateOf(LocalDate.now()) }
     LaunchedEffect(Unit) { while (true) { delay(30_000); today = LocalDate.now() } }
-    val birthdayMode = birthday == today.format(DateTimeFormatter.ofPattern("MM-dd"))
+    val birthdayMode = birthday == today.format(DateTimeFormatter.ofPattern("dd-MM"))
 
     BoxWithConstraints(Modifier.fillMaxSize().background(cennetColors.background)) {
         val landscape = maxWidth > maxHeight
